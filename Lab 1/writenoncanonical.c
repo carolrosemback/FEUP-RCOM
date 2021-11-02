@@ -72,10 +72,23 @@ int main(int argc, char **argv)
 
   printf("New termios structure set\n");
 
-  if(fgets(buf, 255,stdin) == NULL) {
+  if (fgets(buf, 255, stdin) == NULL)
+  {
     exit(1);
   }
+
+  //printf("0x%02x\n", i);
   
+  char F = 0x7E;
+  char A = 0x03;
+  char C = 0x03;
+  char BCC1 = A ^ C;
+  
+  char set[5] = {F, A, C, BCC1, F};
+  for (int i = 0; i < 5; i++)
+    printf("0x%02x\n", set[i]);
+  exit(0);
+
   // adding 1 to compensate '\0'
   int bsize = strlen(buf) + 1;
 
