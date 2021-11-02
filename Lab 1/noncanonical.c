@@ -55,8 +55,8 @@ int main(int argc, char **argv)
   newtio.c_cc[VTIME] = 0; /* inter-character timer unused */
   newtio.c_cc[VMIN] = 1;  /* blocking read until 5 chars received */
 
-  /* 
-    VTIME e VMIN devem ser alterados de forma a proteger com um temporizador a 
+  /*
+    VTIME e VMIN devem ser alterados de forma a proteger com um temporizador a
     leitura do(s) pr�ximo(s) caracter(es)
   */
 
@@ -72,17 +72,31 @@ int main(int argc, char **argv)
 
   // Cannot exceed 255 (buffer size)
   int bsize = 0;
-  do
-  { /* loop for input */
+
+ /* do
+  {
     ++bsize;
     res = read(fd, (buf + bsize-1), 1);
   } while (buf[bsize-1] != '\0');
   printf("%s%d\n", buf, bsize);
   write(fd, buf, bsize);
+*/
 
-  /* 
-    O ciclo WHILE deve ser alterado de modo a respeitar o indicado no gui�o 
-  */
+   //le SET
+   char ua[5];
+   res = read(fd, ua, 5);
+   for(int i =0; i < 5; i++)  
+       printf("|0x%02x|\n", ua[i]);
+
+   //envia UA
+    printf("--------------");
+    ua[1]  = 0x01;
+    ua[2]  = 0x07;
+    ua[3] = ua[1] ^ ua[2];
+   for(int i =0; i < 5; i++)  
+       printf("|0x%02x|\n", ua[i]);
+
+  write(fd, ua, 5);
 
   sleep(1);
   tcsetattr(fd, TCSANOW, &oldtio);
