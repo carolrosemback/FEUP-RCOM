@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
+#include <string.h>
 #include "proj.h"
 
 #define BAUDRATE B38400
@@ -18,42 +19,47 @@
 
 #define MINTIME 5 // in tenth of seconds
 #define MINBYTES 0
-#define MAXTRIES 3
-#define ALARMTIMEOUT 3
 
-int FLAG_RCV = FALSE;
-int A_RCV = FALSE;
-int C_RCV = FALSE;
-int BCC1_OK = FALSE;
+int RECEIVED_UA, FLAG_RCV, C_RCV, A_RCV, BCC1_OK;
 
 typedef unsigned char BYTE;
+LinkLayer link_layer;
+AppLayer app_layer;
+// Used to safe old port settings to restore when disconnecting
+struct termios oldtio, newtio;
 
 volatile int STOP = FALSE;
-int tries = 1, flag = 1, fd, received_set = 0;
-BYTE set[5], ua[5];
+// tries and flag are part of the timeout_set function used for the signal
+int tries = 1, flag = 1;
+BYTE set[5];
 
 void timeout_set();
+int check_ua_byte(BYTE s);
 
 int main(int argc, char **argv)
 {
-  int c, res;
-  struct termios oldtio, newtio;
+  link_layer.baudRate = B38400;
+  strncpy(link_layer.port, argv[1], 20);
+  link_layer.timeout = 3;
+  link_layer.numTransmissions = 3;
+
+  app_layer.file_descriptor = open(link_layer.port, O_RDWR | O_NOCTTY);
+  app_layer.status = TRANSMITTER;
+
   BYTE buf[255];
-  int i, sum = 0, speed = 0;
 
   /*
     Open serial port device for reading and writing and not as controlling tty
     because we don't want to get killed if linenoise sends CTRL-C.
   */
 
-  fd = open(argv[1], O_RDWR | O_NOCTTY);
-  if (fd < 0)
+  if (app_layer.file_descriptor < 0)
   {
     perror(argv[1]);
     exit(-1);
   }
 
-  if (tcgetattr(fd, &oldtio) == -1)
+  if (tcgetattr(app_layer.file_descriptor, &oldtio) == -1)
   { /* save current port settings */
     perror("tcgetattr");
     exit(-1);
@@ -75,9 +81,9 @@ int main(int argc, char **argv)
     leitura do(s) pr�ximo(s) caracter(es)
   */
 
-  tcflush(fd, TCIOFLUSH);
+  tcflush(app_layer.file_descriptor, TCIOFLUSH);
 
-  if (tcsetattr(fd, TCSANOW, &newtio) == -1)
+  if (tcsetattr(app_layer.file_descriptor, TCSANOW, &newtio) == -1)
   {
     perror("tcsetattr");
     exit(-1);
@@ -93,8 +99,10 @@ int main(int argc, char **argv)
 
   //printf("0x%02x\n", i);
 
-  // Enviar SET
+  // llopen STATE
+  RECEIVED_UA = FLAG_RCV = A_RCV = C_RCV = BCC1_OK = FALSE;
 
+  // Enviar SET
   set[0] = F_SET;
   set[1] = A_SET;
   set[2] = C_SET;
@@ -103,52 +111,46 @@ int main(int argc, char **argv)
 
   (void)signal(SIGALRM, timeout_set);
 
-  size_t s;
-  write(fd, set, 5);
 
+  write(app_layer.file_descriptor, set, 5);
   printf("Sent set\n");
   for (int i = 0; i < 5; i++)
     printf("0x%02x\n", set[i]);
 
-  // waits for ua and is responsible for set timeout behavior
-  // Duvida: e se o ua so mandar 4 bytes
-  int bytes_received;
-  while (!received_set && tries <= MAXTRIES)
+  // no retransmission required exit llopen
+  if (link_layer.timeout == 0 || link_layer.numTransmissions == 0)
+    exit(EXIT_SUCCESS);
+
+  BYTE ua;
+  printf("Received ua\n");
+  while (!RECEIVED_UA)
   {
-    if (read(fd, ua, 5) == 5)
-    {
-      received_set = 1;
-      break;
-    }
     if (flag)
     {
-      alarm(ALARMTIMEOUT); // activates timeout_set() in ALARMTIMEOUT seconds
+      alarm(link_layer.timeout); // signal function
       flag = 0;
     }
+    // if nothing is read it is not required to enter the if statement
+    if (read(app_layer.file_descriptor, &ua, 1) > 0)
+    {
+      check_ua_byte(ua);
+      printf("|0x%02x|\n", ua);
+    }
   }
-  if (!received_set)
-  {
-    fprintf(stderr, "Unable to connect after %d tries\n", MAXTRIES);
-    exit(EXIT_FAILURE);
-  }
-
-  printf("----------------------\n");
-  printf("Received ua\n");
-  for (int i = 0; i < 5; i++)
-    printf("0x%02x\n", ua[i]);
 
   exit(EXIT_SUCCESS);
 
   // adding 1 to compensate '\0'
   int bsize = strlen(buf) + 1;
 
-  res = write(fd, buf, bsize);
+  int res;
+  res = write(app_layer.file_descriptor, buf, bsize);
   printf("%d bytes written\n", res);
 
   // setting to empty string
   memset(buf, 0, 255);
 
-  read(fd, buf, bsize);
+  read(app_layer.file_descriptor, buf, bsize);
   printf("Received: %s", buf);
 
   /* 
@@ -157,23 +159,28 @@ int main(int argc, char **argv)
   */
 
   sleep(1);
-  if (tcsetattr(fd, TCSANOW, &oldtio) == -1)
+  if (tcsetattr(app_layer.file_descriptor, TCSANOW, &oldtio) == -1)
   {
     perror("tcsetattr");
     exit(-1);
   }
 
-  close(fd);
+  close(app_layer.file_descriptor);
   return 0;
 }
 
 void timeout_set()
 {
-  if (received_set)
+  if (RECEIVED_UA)
     return;
+  if (tries > link_layer.numTransmissions)
+  {
+    fprintf(stderr, "Unable to connect after %d tries\n", link_layer.numTransmissions);
+    exit(EXIT_FAILURE);
+  }
   printf("escrevendo # %d\n", tries);
   tries++;
-  write(fd, set, 5);
+  write(app_layer.file_descriptor, set, 5);
   flag = 1;
 }
 
@@ -182,20 +189,33 @@ int check_ua_byte(BYTE s)
   switch (s)
   {
   case F_UA:
-    FLAG_RCV = TRUE;
+    // Read 2nd Flag (End of UA)
+    if (BCC1_OK)
+      RECEIVED_UA = TRUE;
+    // Received normal Flag
+    else
+    {
+      FLAG_RCV = TRUE;
+      A_RCV = C_RCV = BCC1_OK = FALSE;
+    }
     break;
   case A_UA:
     if (FLAG_RCV)
       A_RCV = TRUE;
+    break;
   case C_UA:
-    if(FLAG_RCV && A_RCV)
-      C_RCV=TRUE;
+    if (A_RCV)
+      C_RCV = TRUE;
+    break;
   case BCC1_UA:
-    if (FLAG_RCV && A_RCV && C_RCV)
+    if (C_RCV)
       BCC1_OK = TRUE;
+    break;
   default:
+    // Restarting SET verification
     FLAG_RCV = A_RCV = C_RCV = BCC1_OK = FALSE;
     break;
   }
   return TRUE;
 }
+

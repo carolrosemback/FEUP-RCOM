@@ -12,14 +12,10 @@
 #define FALSE 0
 #define TRUE 1
 
-int FLAG_RCV = FALSE;
-int A_RCV = FALSE;
-int C_RCV = FALSE;
-int BCC1_OK = FALSE;
+int RECEIVED_SET, FLAG_RCV, A_RCV, C_RCV, BCC1_OK;
 
 typedef unsigned char BYTE;
 int check_set_byte(BYTE s);
-
 
 volatile int STOP = FALSE;
 
@@ -41,6 +37,7 @@ int main(int argc, char **argv)
     because we don't want to get killed if linenoise sends CTRL-C.
   */
 
+  // VER SLIDE 17 do guiao de trabalho
   fd = open(argv[1], O_RDWR | O_NOCTTY);
   if (fd < 0)
   {
@@ -92,15 +89,17 @@ int main(int argc, char **argv)
   write(fd, buf, bsize);
 */
 
-// llopen State
-  //le SET
-  BYTE set;
+  // llopen State
+  BYTE set_byte;
+  RECEIVED_SET = FLAG_RCV = A_RCV = C_RCV = BCC1_OK = FALSE;
   printf("||\n");
-  while(!(FLAG_RCV && A_RCV && C_RCV && BCC1_OK)){
-    read(fd,&set,1);
-    check_set_byte(set);
+  while (!RECEIVED_SET)
+  {
+    read(fd, &set_byte, 1);
+    check_set_byte(set_byte);
+    printf("|0x%02x|\n", set_byte);
   }
-  
+
   BYTE ua[5];
   //envia UA
   printf("--------------\n");
@@ -110,14 +109,11 @@ int main(int argc, char **argv)
   ua[3] = BCC1_UA;
   ua[4] = F_UA;
 
-
-
-
-
-
   for (int i = 0; i < 5; i++)
     printf("|0x%02x|\n", ua[i]);
   write(fd, ua, 5);
+
+
 
   sleep(1);
   tcsetattr(fd, TCSANOW, &oldtio);
@@ -127,22 +123,41 @@ int main(int argc, char **argv)
 
 int check_set_byte(BYTE s)
 {
+  // Switch used to simulate SET State Machine
   switch (s)
   {
   case F_SET:
-    FLAG_RCV = TRUE;
+    // Received end of UA
+    if (BCC1_OK)
+      RECEIVED_SET = TRUE;
+      
+    // Received normal Flag
+    else
+    {
+      FLAG_RCV = TRUE;
+      A_RCV = C_RCV = BCC1_OK = FALSE;
+    }
     break;
   case A_SET:
-    if (FLAG_RCV && A_RCV)
+    // C_SET case (which coincidentally has the same number as A_SET)
+    if (A_RCV)
       C_RCV = TRUE;
+    // Actual A_SET case
     else if (FLAG_RCV)
       A_RCV = TRUE;
+    break;
   case BCC1_SET:
-    if (FLAG_RCV && A_RCV && C_RCV)
+    if (C_RCV)
       BCC1_OK = TRUE;
+    break;
   default:
     FLAG_RCV = A_RCV = C_RCV = BCC1_OK = FALSE;
     break;
   }
   return TRUE;
+}
+
+int llopen(int porta, int mode){
+
+  return 0;
 }
