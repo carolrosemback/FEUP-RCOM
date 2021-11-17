@@ -50,7 +50,8 @@ int main(int argc, char const *argv[])
 
     // O que devo fazer quando llopen falha? (continuar até dar, desistir...)
     // onde guardo o link_layer (dou como argumento &link_layer, defino no app...)
-    llopen(app_layer);
+    //llopen(app_layer);
+    llwrite("Luis gg", strlen("Luis gg"));
     llclose();
 
     return 0;

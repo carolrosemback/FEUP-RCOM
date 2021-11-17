@@ -4,6 +4,8 @@
 #define TRANSMITTER 1
 #define RECEIVER 0
 
+#define DATA_PACKAGE 100
+
 typedef struct AppLayer
 {
     int fd;     // File Descriptor that matches intended port

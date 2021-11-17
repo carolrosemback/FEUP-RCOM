@@ -18,7 +18,7 @@ AppLayer app_layer;
 LinkLayer link_layer;
 
 int tries = 0, flag = TRUE, received_control = FALSE, failed_connection = FALSE, port_configured = FALSE;
-BYTE set[5];
+BYTE set[5], ns;
 
 int llopen(AppLayer upper_layer)
 {
@@ -52,10 +52,6 @@ int llopen(AppLayer upper_layer)
             return -1;
         }
 
-        printf("Sent set\n");
-        for (int i = 0; i < 5; i++)
-            printf("0x%02x\n", set[i]);
-
         BYTE ua_byte;
         while (!received_control)
         {
@@ -73,19 +69,16 @@ int llopen(AppLayer upper_layer)
             if (read(app_layer.fd, &ua_byte, 1) > 0)
             {
                 check_ua_byte(ua_byte, control_frames);
-                printf("READ |0x%02x|\n", ua_byte);
             }
         }
     }
     else
     {
         BYTE set_byte;
-        printf("||\n");
         while (!received_control)
         {
             read(app_layer.fd, &set_byte, 1);
             check_set_byte(set_byte, control_frames);
-            printf("|0x%02x|\n", set_byte);
         }
 
         printf("--------------\n");
@@ -96,15 +89,45 @@ int llopen(AppLayer upper_layer)
         ua[2] = C_UA;
         ua[3] = BCC1_UA;
         ua[4] = F_UA;
-
-        for (int i = 0; i < 5; i++)
-            printf("|0x%02x|\n", ua[i]);
         write(app_layer.fd, ua, 5);
     }
 
     return 0;
 }
 
+// App data package is always smaller than Data-Link package
+int llwrite(BYTE* buff, int length){
+    printf("Length is %d\n", length);
+    BYTE info_packet[DATA_FRAMES_MAX_SIZE];
+    BYTE* cur_pos = info_packet;
+    // info_packet[0] = F_SET;
+    // info_packet[1] = A_SET;
+    info_packet[2] = (ns==1) ? 0x01000000 : 0x0;
+    // info_packet[3] = info_packet[1] ^ info_packet[2];
+
+    info_packet[0] = 'o';
+    info_packet[1] = 'l';
+    info_packet[2] = 'a';
+    info_packet[3] = ' ';
+    cur_pos +=4;
+    BYTE bcc2 = 0;
+    for(int i=0;i<length;i++){
+        *(cur_pos+i) = buff[i];
+        bcc2 = bcc2 ^ buff[i];
+        
+    }
+    // cur_pos++;
+    // *cur_pos = bcc2;
+    // cur_pos++;
+    // *cur_pos = F_SET;
+    cur_pos++;
+    *cur_pos = 'a';
+    cur_pos++;
+    *cur_pos = '\n';
+    printf("%d|\n%s", strlen(info_packet),info_packet);
+    //write(app_layer.fd, info_packet, 4 + length + 2);
+    return 0;
+}
 int llclose()
 {
     int res = port_restore();

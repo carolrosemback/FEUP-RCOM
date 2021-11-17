@@ -1,3 +1,4 @@
+// Calcular o bcc2 antes do byte stuffing e fazer stuffing do bcc2
 #ifndef DATALINK_H
 #define DATALINK_H
 
@@ -35,6 +36,9 @@
 #define FRAME_SIZE 20
 #define BAUDRATE B38400
 
+// Minimum of 9 bytes to fit control frames
+#define DATA_FRAMES_MAX_SIZE 100*2 
+
 typedef unsigned char BYTE;
 typedef struct LinkLayer
 {
@@ -47,6 +51,7 @@ typedef struct LinkLayer
 } LinkLayer;
 
 int llopen(AppLayer);
+int llwrite(BYTE* buff, int length);
 int llclose();
 
 #endif
