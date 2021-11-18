@@ -36,8 +36,21 @@
 #define FRAME_SIZE 20
 #define BAUDRATE B38400
 
+// Escape bytes
+#define ESC_BYTE1 0x7E
+#define ESC_BYTE2 0x7D
+
+#define REPLACE_BYTE1 0x7D
+#define REPLACE_BYTE2 0x5E
+#define REPLACE_BYTE3 0x5D
+
+
 // Minimum of 9 bytes to fit control frames
-#define DATA_FRAMES_MAX_SIZE 100*2 
+#define DATA_FRAMES_MAX_SIZE DATA_PACKAGE*2 + 6
+#define RR_0 0x05
+#define RR_1 0x85
+#define REJ_0 0x01
+#define REJ_1 0x81
 
 typedef unsigned char BYTE;
 typedef struct LinkLayer
@@ -52,6 +65,7 @@ typedef struct LinkLayer
 
 int llopen(AppLayer);
 int llwrite(BYTE* buff, int length);
+int llread();
 int llclose();
 
 #endif

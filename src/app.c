@@ -19,7 +19,8 @@ int main(int argc, char const *argv[])
     AppLayer app_layer;
 
     app_layer.fd = open(argv[1], O_RDWR | O_NOCTTY);
-    if(app_layer.fd < 0){
+    if (app_layer.fd < 0)
+    {
         perror("Unable to open port");
         return -1;
     }
@@ -44,14 +45,29 @@ int main(int argc, char const *argv[])
         app_layer.status = RECEIVER;
     else
     {
-        fprintf(stderr,"No valid letter was entered\n");
+        fprintf(stderr, "No valid letter was entered\n");
         return -1;
     }
 
     // O que devo fazer quando llopen falha? (continuar até dar, desistir...)
     // onde guardo o link_layer (dou como argumento &link_layer, defino no app...)
-    //llopen(app_layer);
-    llwrite("Luis gg", strlen("Luis gg"));
+    llopen(app_layer);
+    BYTE str1[5];
+    str1[0] = 0xFF;
+    str1[1] = 0x7D;
+    str1[2] = 0x44;
+    str1[3] = 0x7E;
+    str1[4] = 0x22;
+    if (app_layer.status == TRANSMITTER)
+    {
+        llwrite(str1, 5);
+        llwrite(str1, 5);
+    }
+    else
+    {
+        llread();
+        llread();
+    }
     llclose();
 
     return 0;
