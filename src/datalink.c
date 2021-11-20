@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include <stdio.h>
+#include <sys/types.h>
 #include <string.h>
 #include "datalink.h"
 #include <signal.h>
@@ -190,24 +191,136 @@ int llwrite(BYTE *buff, int length)
 }
 
 // Lembrar do caso em que o ua não é recebido e recebo outro set
-int llread()
+int llread(BYTE* buff)
 {
-    BYTE a[13];
-    read(app_layer.fd, a, 13);
-    for (int i = 0; i < 13; i++)
-        printf("|%x| ", a[i] & 0xff);
+    BYTE frame[DATA_FRAMES_MAX_SIZE], rj=0, rr=0;
+    BYTE input, *final_fr, *data, *destuffed_data;
+    int control_frame[4];
+    unsigned long int index=0;
+    int verified = FALSE, data_size=0;
+; 
+
+    while(tries < 3)
+    {
+        alarm(3);
+        while(!verified)
+        {
+            read(app_layer.fd, input, 1);
+            frame[index] = input;
+            switch(input){
+            case F_SET:
+                control_frame[0] = TRUE;
+                break;
+            case A_SET:
+            if(control_frame[0])
+                control_frame[1] = TRUE;
+                break;
+            case C_UA:
+            if(control_frame[1])
+                control_frame[2] = TRUE;
+                break;
+            case BCC1_SET:
+            if (control_frame[2])
+                control_frame[3] = TRUE;
+                break;
+            default:
+                if(input == F_SET){
+                    verified = TRUE;
+                    break;
+                }
+                index++;
+                break;  
+              
+            }
+            alarm(0);
+        }
     
-    BYTE reply = (a[2] == 0x40) ? REJ_0 : REJ_1;
-    printf("\nSending rejected\n");
-    write(app_layer.fd, &reply, 1);
+    }
+
+    // frame fitting to real size
+    BYTE *res = malloc(sizeof(BYTE)*index);
+    memcpy(res, frame, sizeof(BYTE)*index);
+
+    data = retrieve_data(final_fr,index,&data_size);
+    destuffed_data = byte_destuffing(frame, &index);
+    BYTE bcc2 = 0, r_bcc2 = destuffed_data[index-1];
+
+    for(int i = 0; i<index-1; i++)
+        bcc2 ^= data[i];
+
+    rj = (frame[2] == 0b010000000 ? REJ_0 : REJ_1);
+    rr = (frame[2] == 0b010000000 ? RR_0 : RR_1);
     
-    read(app_layer.fd, a, 13);
-    for (int i = 0; i < 13; i++)
-        printf("|%x| ", a[i] & 0xff);
-    printf("\n---------------------\n");
-    reply = (a[2] == 0x40) ? RR_0 : RR_1;
-    write(app_layer.fd, &reply, 1);
+
+    BYTE new_frame[5];
+    if(bcc2 != r_bcc2){
+        printf("ERROR in BCC2!");
+        if(write(app_layer.fd, new_frame, 5) < 5)
+        {
+            printf("ERROR writing new_frame");
+            create_frame(frame[1], rj, new_frame);
+        }
+    }
+
+    create_frame(frame[1], rr, new_frame);
+    memcpy(buff, destuffed_data, data_size-1);
+    free(final_fr);
+    free(data); 
+    free(destuffed_data);
     return frame_size;
+}
+
+
+void create_frame(BYTE a, BYTE c, BYTE* new_frame)
+{
+    new_frame[0] = F_SET;
+    new_frame[1] = a;
+    new_frame[2] = c;
+    new_frame[3] = new_frame[1] ^ new_frame[2];
+    new_frame[4] = F_SET;
+}
+
+
+
+BYTE* retrieve_data(BYTE *fr, unsigned int size, unsigned int *index) {
+    *index = size - 5;
+    BYTE *data = (unsigned char*)malloc(*index);
+    data = memcpy(data, &fr[4], *index);
+    return data;
+}
+
+
+BYTE* byte_destuffing(BYTE *frame, unsigned int *size)
+{
+    BYTE* res;
+    unsigned int n_size, escapes = 0;
+    int offset=0;
+    for (int i = 0; i < *size;i++){
+        if(i < (*size - 1)) //gets bcc
+        {
+            if(frame[i] == 0x7d && frame[i + 1] == 0x5e)
+                escapes++;
+
+            if(frame[i] == 0x7d && frame[i + 1] == 0x5d)
+                escapes++;
+        }
+    }
+    n_size = *size - escapes;
+    res = malloc(sizeof(BYTE)*n_size);
+    *size = n_size; //updates size 
+    for (unsigned long i = 0; i < n_size;){
+        if(frame[i + offset] == 0x7d && frame[i + 1 + offset] == 0x5e){
+            res[i++] = F_SET; //writes F_SET at i, and increments i for next position
+            offset++;
+        }
+        else if(frame[i+offset] == 0x7d && frame[i+1+offset] == 0x5d){
+            res[i++] = ESC_BYTE2;
+            offset++;
+        }
+        else //not an stuffed byte, goes to next position
+            res[i++] = frame[i+offset];
+    }
+    return res;
 }
 
 int llclose()

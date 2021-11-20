@@ -65,7 +65,11 @@ typedef struct LinkLayer
 
 int llopen(AppLayer);
 int llwrite(BYTE* buff, int length);
-int llread();
+int llread(BYTE* buff);
 int llclose();
+BYTE* byte_destuffing(BYTE *frame, unsigned int *size);
+BYTE* retrieve_data(BYTE *frame, unsigned int size, unsigned int *data_size);
+void create_frame(BYTE a, BYTE c, BYTE* new_frame);
+
 
 #endif

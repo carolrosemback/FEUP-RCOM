@@ -65,8 +65,8 @@ int main(int argc, char const *argv[])
     }
     else
     {
-        llread();
-        llread();
+        llread(str1);
+        llread(str1);
     }
     llclose();
 
