@@ -4,7 +4,7 @@
 #define TRANSMITTER 1
 #define RECEIVER 0
 
-#define DATA_PACKAGE 100
+#define DATA_PACKAGE 2048
 
 typedef struct AppLayer
 {

@@ -34,9 +34,7 @@ int main(int argc, char const *argv[])
         return (-1);
     }
 
-    printf("Type T if you wish to transmit data or type R if instead you wish to receive data:\n");
-    char mode;
-    scanf("%c", &mode);
+    char mode = argv[2][0];
     if (mode == 'T')
     {
         app_layer.status = TRANSMITTER;
@@ -51,24 +49,57 @@ int main(int argc, char const *argv[])
 
     // O que devo fazer quando llopen falha? (continuar até dar, desistir...)
     // onde guardo o link_layer (dou como argumento &link_layer, defino no app...)
-    llopen(app_layer);
-    BYTE str1[5];
-    str1[0] = 0xFF;
-    str1[1] = 0x7D;
-    str1[2] = 0x44;
-    str1[3] = 0x7E;
-    str1[4] = 0x22;
+    if (llopen(app_layer) <= 0)
+        return -1;
+    printf("Connected with success\n");
+
     if (app_layer.status == TRANSMITTER)
     {
-        llwrite(str1, 5);
-        llwrite(str1, 5);
+        BYTE buff[DATA_PACKAGE];
+        FILE *file_to_send = fopen(argv[3], "rb");
+        if (file_to_send <= 0)
+        {
+            perror("fopen\n");
+            return -1;
+        }
+
+        int length = 0;
+        while ((length = fread(buff, sizeof(BYTE), DATA_PACKAGE, file_to_send)) > 0)
+        {
+            llwrite(buff, length);
+        }
+
+        //BYTE str2[8] = {0x00, 0xff, 0x7e, 0x5e, 0x7e, 0x7d, 0x5d, 0xff};
+        // BYTE str2[2] = {0x7e, 0x7d};
+        // llwrite(str2, 2);
+        llclose();
+        fclose(file_to_send);
     }
     else
     {
-        llread(str1);
-        llread(str1);
+        int length;
+        FILE *file_to_write;
+        file_to_write = fopen(argv[3], "wb");
+        if (file_to_write <= 0)
+        {
+            perror("fopen\n");
+            return -1;
+        }
+        do
+        {
+            // Creating data package for the app
+            BYTE buff[DATA_PACKAGE];
+            length = llread(buff);
+            if (length <= 0)
+                return length;
+            // printf("Read %d bytes\n", length);
+            // for (int i = 0; i < length; i++)
+            //     printf("%x ", buff[i] & 0xff);
+
+            fwrite(buff, length, sizeof(BYTE), file_to_write);
+        } while (length != 0);
+        fclose(file_to_write);
     }
-    llclose();
 
     return 0;
 }

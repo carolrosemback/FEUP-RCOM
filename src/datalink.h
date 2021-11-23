@@ -17,23 +17,28 @@
 #define MIN_BYTES_TRANSMITTER 0
 #define MIN_BYTES_RECEIVER 1
 
-
 #define FALSE 0
 #define TRUE 1
 
-// SET
-#define F_SET 0x7E
-#define A_SET 0x03
-#define C_SET 0x03
-#define BCC1_SET (A_SET ^ C_SET)
+#define FLAG 0x7E
 
-// UA
-#define F_UA 0x7E
-#define A_UA 0x03
-#define C_UA 0x07
-#define BCC1_UA (A_UA ^ C_UA)
+// Control Fields
+#define DISC 0x0B
+#define SET 0x03
+#define UA 0x07
+#define RR_0 0x05
+#define RR_1 0x85
+#define REJ_0 0x01
+#define REJ_1 0x81
+#define DATA_CTRL_1 0x40
+#define DATA_CTRL_0 0x00
 
-#define FRAME_SIZE 20
+// Address Fields
+// Commands sent by the transmitter and replies sent by receiver
+#define AF_TRANS 0x03
+// Commands sent by the receiver and replies sent by transmitter
+#define AF_REC 0x01
+
 #define BAUDRATE B38400
 
 // Escape bytes
@@ -44,9 +49,8 @@
 #define REPLACE_BYTE2 0x5E
 #define REPLACE_BYTE3 0x5D
 
-
 // Minimum of 9 bytes to fit control frames
-#define DATA_FRAMES_MAX_SIZE DATA_PACKAGE*2 + 6
+#define DATA_FRAMES_MAX_SIZE DATA_PACKAGE * 2 + 6
 #define RR_0 0x05
 #define RR_1 0x85
 #define REJ_0 0x01
@@ -59,17 +63,12 @@ typedef struct LinkLayer
     unsigned int sequenceNumber;   /*Número de sequência da trama: 0, 1*/
     unsigned int timeout;          /*Valor do temporizador: 1 s*/
     unsigned int numTransmissions; /*Número de tentativas em caso de falha*/
-    char frame[FRAME_SIZE];        /*Trama*/
     struct termios oldtio;         /*Port old settings*/
 } LinkLayer;
 
 int llopen(AppLayer);
-int llwrite(BYTE* buff, int length);
-int llread(BYTE* buff);
+int llwrite(BYTE *buff, int length);
+int llread(BYTE *buff);
 int llclose();
-BYTE* byte_destuffing(BYTE *frame, unsigned int *size);
-BYTE* retrieve_data(BYTE *frame, unsigned int size, unsigned int *data_size);
-void create_frame(BYTE a, BYTE c, BYTE* new_frame);
-
 
 #endif

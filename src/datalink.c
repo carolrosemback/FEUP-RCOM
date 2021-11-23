@@ -2,8 +2,9 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <string.h>
-#include "datalink.h"
 #include <signal.h>
+#include <stdlib.h>
+#include "datalink.h"
 
 int port_restore();
 int port_setup();
@@ -12,8 +13,11 @@ int port_setup();
 // These functions only equals 1 iteration of the automaton for their respective frames
 void check_ua_byte(BYTE s, int *control_frames);
 void check_set_byte(BYTE s, int *control_frames);
+void check_disc_byte(BYTE s, int *control_frames);
 void timeout_set();
 void timeout_i();
+void timeout_disc();
+void llread_header_check(BYTE s, int *control_frames, BYTE *control_field);
 
 AppLayer app_layer;
 LinkLayer link_layer;
@@ -37,24 +41,20 @@ int llopen(AppLayer upper_layer)
         port_configured = TRUE;
     }
 
-    BYTE ssss;
-    read(app_layer.fd,&ssss,1);
-    printf("Hello\n");
-
     int control_frames[5];
     memset(control_frames, FALSE, 5 * sizeof(int));
 
-    tries = 0;
-    flag = TRUE;
     received_control = FALSE;
-    failed_connection = FALSE;
     if (app_layer.status == TRANSMITTER)
     {
-        set[0] = F_SET;
-        set[1] = A_SET;
-        set[2] = C_SET;
-        set[3] = BCC1_SET;
-        set[4] = F_SET;
+        flag = TRUE;
+        tries = 0;
+        failed_connection = FALSE;
+        set[0] = FLAG;
+        set[1] = AF_TRANS;
+        set[2] = SET;
+        set[3] = set[1] ^ set[2];
+        set[4] = FLAG;
 
         (void)signal(SIGALRM, timeout_set);
         res = write(app_layer.fd, set, 5);
@@ -68,7 +68,9 @@ int llopen(AppLayer upper_layer)
         while (!received_control)
         {
             if (failed_connection)
-            {
+            {   
+                alarm(0);
+                port_restore();
                 fprintf(stderr, "Unable to connect after %d tries\n", link_layer.numTransmissions);
                 return -1;
             }
@@ -94,11 +96,11 @@ int llopen(AppLayer upper_layer)
         }
 
         BYTE ua[5];
-        ua[0] = F_UA;
-        ua[1] = A_UA;
-        ua[2] = C_UA;
-        ua[3] = BCC1_UA;
-        ua[4] = F_UA;
+        ua[0] = FLAG;
+        ua[1] = AF_TRANS;
+        ua[2] = UA;
+        ua[3] = ua[1] ^ ua[2];
+        ua[4] = FLAG;
         write(app_layer.fd, ua, 5);
     }
     alarm(0);
@@ -108,10 +110,9 @@ int llopen(AppLayer upper_layer)
 // App data package is always smaller than Data-Link package
 int llwrite(BYTE *buff, int length)
 {
-    printf("ns=%d\n",ns);
-    data_packet[0] = F_SET;
-    data_packet[1] = A_SET;
-    data_packet[2] = (ns == 1) ? 0x40 : 0x00;
+    data_packet[0] = FLAG;
+    data_packet[1] = AF_TRANS;
+    data_packet[2] = (ns == 1) ? DATA_CTRL_1 : DATA_CTRL_0;
     data_packet[3] = data_packet[1] ^ data_packet[2];
 
     // Creating the Data Frame
@@ -137,12 +138,26 @@ int llwrite(BYTE *buff, int length)
         bcc2 = bcc2 ^ buff[i];
     }
 
-    data_packet[cur_pos] = bcc2;
+    // Byte stuffing of bcc2
+    if (bcc2 == ESC_BYTE1)
+    {
+        data_packet[cur_pos] = REPLACE_BYTE1;
+        cur_pos++;
+        data_packet[cur_pos] = REPLACE_BYTE2;
+    }
+    else if (bcc2 == ESC_BYTE2)
+    {
+        data_packet[cur_pos] = REPLACE_BYTE1;
+        ++cur_pos;
+        data_packet[cur_pos] = REPLACE_BYTE3;
+    }
+    else
+        data_packet[cur_pos] = bcc2;
     cur_pos++;
-    data_packet[cur_pos] = F_SET;
+
+    data_packet[cur_pos] = FLAG;
 
     frame_size = cur_pos + 1;
-    printf("length %d\n", frame_size);
     write(app_layer.fd, data_packet, frame_size);
 
     // Variables used for timeout function
@@ -158,6 +173,7 @@ int llwrite(BYTE *buff, int length)
     {
         if (failed_connection)
         {
+            port_restore();
             fprintf(stderr, "Unable to connect after %d tries\n", link_layer.numTransmissions);
             return -1;
         }
@@ -190,141 +206,152 @@ int llwrite(BYTE *buff, int length)
     return 0;
 }
 
-// Lembrar do caso em que o ua não é recebido e recebo outro set
-int llread(BYTE* buff)
+int llread(BYTE *buff)
 {
-    BYTE frame[DATA_FRAMES_MAX_SIZE], rj=0, rr=0;
-    BYTE input, *final_fr, *data, *destuffed_data;
-    int control_frame[4];
-    unsigned long int index=0;
-    int verified = FALSE, data_size=0;
-; 
-
-    while(tries < 3)
+    int control_frames[5];
+    memset(control_frames, FALSE, 5 * sizeof(int));
+    received_control = FALSE;
+    BYTE b, control_field;
+    while (!received_control)
     {
-        alarm(3);
-        while(!verified)
+        read(app_layer.fd, &b, 1);
+        llread_header_check(b, control_frames, &control_field);
+    }
+    BYTE resp[5] = {FLAG, AF_TRANS, 0, 0, FLAG};
+
+    /* 
+    Reading 1 bit to check if its FLAG (Supervision or Unnumbered frames)
+    or if its another bit (Data frame)
+    */
+    read(app_layer.fd, &b, 1);
+    if (b == FLAG) // Supervision or Unnumbered frames
+    {
+        // Transmitor did not receive UA
+        if (control_field == SET)
         {
-            read(app_layer.fd, input, 1);
-            frame[index] = input;
-            switch(input){
-            case F_SET:
-                control_frame[0] = TRUE;
-                break;
-            case A_SET:
-            if(control_frame[0])
-                control_frame[1] = TRUE;
-                break;
-            case C_UA:
-            if(control_frame[1])
-                control_frame[2] = TRUE;
-                break;
-            case BCC1_SET:
-            if (control_frame[2])
-                control_frame[3] = TRUE;
-                break;
-            default:
-                if(input == F_SET){
-                    verified = TRUE;
-                    break;
+            resp[1] = AF_TRANS;
+            resp[2] = UA;
+            resp[3] = resp[1] ^ resp[2];
+            write(app_layer.fd, resp, 5);
+            return llread(buff);
+        }
+        else if (control_field == DISC)
+        {
+            resp[1] = AF_REC;
+            resp[2] = DISC;
+            resp[3] = resp[1] ^ resp[2];
+            write(app_layer.fd, resp, 5);
+            while (1)
+            {
+                read(app_layer.fd, resp, 5);
+                // if its a UA frame
+                if (resp[0] == FLAG && resp[4] == FLAG && resp[1] == AF_REC && resp[2] == UA && resp[3] == (resp[1] ^ resp[2]))
+                    return 0;
+                // if the DISC frame again (UA was lost and transmittor timed out)
+                else if (resp[0] == FLAG && resp[4] == FLAG && resp[1] == AF_TRANS && resp[2] == DISC && resp[3] == (resp[1] ^ resp[2]))
+                {
+                    write(app_layer.fd, resp, 5);
                 }
-                index++;
-                break;  
-              
             }
-            alarm(0);
         }
-    
     }
-
-    // frame fitting to real size
-    BYTE *res = malloc(sizeof(BYTE)*index);
-    memcpy(res, frame, sizeof(BYTE)*index);
-
-    data = retrieve_data(final_fr,index,&data_size);
-    destuffed_data = byte_destuffing(frame, &index);
-    BYTE bcc2 = 0, r_bcc2 = destuffed_data[index-1];
-
-    for(int i = 0; i<index-1; i++)
-        bcc2 ^= data[i];
-
-    rj = (frame[2] == 0b010000000 ? REJ_0 : REJ_1);
-    rr = (frame[2] == 0b010000000 ? RR_0 : RR_1);
-    
-
-    BYTE new_frame[5];
-    if(bcc2 != r_bcc2){
-        printf("ERROR in BCC2!");
-        if(write(app_layer.fd, new_frame, 5) < 5)
+    else // Data frame case
+    {
+        // duplicate data frame
+        if ((control_field == DATA_CTRL_0 && ns == 1) || (control_field == DATA_CTRL_1 && ns == 0))
         {
-            printf("ERROR writing new_frame");
-            create_frame(frame[1], rj, new_frame);
+            resp[2] = (control_field == DATA_CTRL_0) ? RR_1 : RR_0;
+            resp[3] = resp[1] ^ resp[2];
+            write(app_layer.fd, resp, 5);
+            return llread(buff);
         }
-    }
-
-    create_frame(frame[1], rr, new_frame);
-    memcpy(buff, destuffed_data, data_size-1);
-    free(final_fr);
-    free(data); 
-    free(destuffed_data);
-    return frame_size;
-}
-
-
-void create_frame(BYTE a, BYTE c, BYTE* new_frame)
-{
-    new_frame[0] = F_SET;
-    new_frame[1] = a;
-    new_frame[2] = c;
-    new_frame[3] = new_frame[1] ^ new_frame[2];
-    new_frame[4] = F_SET;
-}
-
-
-
-BYTE* retrieve_data(BYTE *fr, unsigned int size, unsigned int *index) {
-    *index = size - 5;
-    BYTE *data = (unsigned char*)malloc(*index);
-    data = memcpy(data, &fr[4], *index);
-    return data;
-}
-
-
-BYTE* byte_destuffing(BYTE *frame, unsigned int *size)
-{
-    BYTE* res;
-    unsigned int n_size, escapes = 0;
-    int offset=0;
-    for (int i = 0; i < *size;i++){
-        if(i < (*size - 1)) //gets bcc
+        // new data frame
+        else if (control_field == DATA_CTRL_0 || control_field == DATA_CTRL_1)
         {
-            if(frame[i] == 0x7d && frame[i + 1] == 0x5e)
-                escapes++;
-
-            if(frame[i] == 0x7d && frame[i + 1] == 0x5d)
-                escapes++;
+            int cur_pos = 0, bcc2 = 0;
+            BYTE b2;
+            while (1)
+            {
+                read(app_layer.fd, &b2, 1);
+                // BYTE DESTUFFING
+                if (b == REPLACE_BYTE1)
+                {
+                    if (b2 == REPLACE_BYTE2)
+                        b = buff[cur_pos] = ESC_BYTE1;
+                    else if (b2 == REPLACE_BYTE3)
+                        b = buff[cur_pos] = ESC_BYTE2;
+                    read(app_layer.fd, &b2, 1);
+                }
+                // Data Frame ended
+                if (b2 == FLAG)
+                {
+                    resp[1] = AF_TRANS;
+                    if (bcc2 == b)
+                    {
+                        resp[2] = (control_field == DATA_CTRL_1) ? RR_0 : RR_1;
+                        resp[3] = resp[1] ^ resp[2];
+                        write(app_layer.fd, resp, 5);
+                        ns = ns ? 0 : 1;
+                        return cur_pos;
+                    }
+                    // Frame has errors
+                    else
+                    {
+                        resp[2] = (control_field == DATA_CTRL_1) ? REJ_0 : REJ_1;
+                        resp[3] = resp[1] ^ resp[2];
+                        write(app_layer.fd, resp, 5);
+                        return llread(buff);
+                    }
+                }
+                else
+                    buff[cur_pos] = b;
+                bcc2 = bcc2 ^ buff[cur_pos];
+                cur_pos++;
+                b = b2;
+            }
         }
     }
-    n_size = *size - escapes;
-    res = malloc(sizeof(BYTE)*n_size);
-    *size = n_size; //updates size 
-    for (unsigned long i = 0; i < n_size;){
-        if(frame[i + offset] == 0x7d && frame[i + 1 + offset] == 0x5e){
-            res[i++] = F_SET; //writes F_SET at i, and increments i for next position
-            offset++;
-        }
-        else if(frame[i+offset] == 0x7d && frame[i+1+offset] == 0x5d){
-            res[i++] = ESC_BYTE2;
-            offset++;
-        }
-        else //not an stuffed byte, goes to next position
-            res[i++] = frame[i+offset];
-    }
-    return res;
+    return 0;
 }
 
+// Close used only by transmitter
 int llclose()
 {
+    tries = 0;
+    flag = TRUE;
+    received_control = FALSE;
+    failed_connection = FALSE;
+    BYTE send[5] = {FLAG, AF_TRANS, DISC, AF_TRANS ^ DISC, FLAG};
+    write(app_layer.fd, send, 5);
+
+    (void)signal(SIGALRM, timeout_disc);
+
+    int control_frames[5] = {FALSE, FALSE, FALSE, FALSE, FALSE};
+    BYTE disc_byte;
+    while (!received_control)
+    {
+        if (failed_connection)
+        {
+            port_restore();
+            fprintf(stderr, "Unable to connect after %d tries\n", link_layer.numTransmissions);
+            return -1;
+        }
+        if (flag)
+        {
+            alarm(link_layer.timeout); // signal function
+            flag = FALSE;
+        }
+        // if nothing is read it is not required to enter the if statement
+        if (read(app_layer.fd, &disc_byte, 1) > 0)
+        {
+            check_disc_byte(disc_byte, control_frames);
+        }
+    }
+    send[1] = AF_REC;
+    send[2] = UA;
+    send[3] = send[1] ^ send[2];
+    write(app_layer.fd,send,5);
+    alarm(0);
     int res = port_restore();
     if (res != 0) // error
         return res;
@@ -398,13 +425,10 @@ void check_ua_byte(BYTE s, int *control_frames)
 {
     switch (s)
     {
-    case F_UA:
+    case FLAG:
         // Read 2nd Flag (End of UA)
         if (control_frames[3])
-        {
-            control_frames[4] = TRUE;
             received_control = TRUE;
-        }
         // Received normal Flag
         else
         {
@@ -412,20 +436,26 @@ void check_ua_byte(BYTE s, int *control_frames)
             control_frames[1] = control_frames[2] = control_frames[3] = FALSE;
         }
         break;
-    case A_UA:
+    case AF_TRANS:
         if (control_frames[0])
             control_frames[1] = TRUE;
+        else
+            control_frames[0] = control_frames[1] = control_frames[2] = control_frames[3] = FALSE;
         break;
-    case C_UA:
+    case UA:
         if (control_frames[1])
             control_frames[2] = TRUE;
+        else
+            control_frames[0] = control_frames[1] = control_frames[2] = control_frames[3] = FALSE;
         break;
-    case BCC1_UA:
+    case (AF_TRANS ^ UA):
         if (control_frames[2])
             control_frames[3] = TRUE;
+        else
+            control_frames[0] = control_frames[1] = control_frames[2] = control_frames[3] = FALSE;
         break;
     default:
-        // Restarting SET verification
+        // Restarting UA verification
         control_frames[0] = control_frames[1] = control_frames[2] = control_frames[3] = FALSE;
         break;
     }
@@ -438,13 +468,10 @@ void check_set_byte(BYTE s, int *control_frames)
     // Switch used to simulate SET State Machine
     switch (s)
     {
-    case F_SET:
+    case FLAG:
         // Received end of UA
         if (control_frames[3])
-        {
-            control_frames[4] = TRUE;
             received_control = TRUE;
-        }
 
         // Received normal Flag
         else
@@ -453,22 +480,102 @@ void check_set_byte(BYTE s, int *control_frames)
             control_frames[1] = control_frames[2] = control_frames[3] = FALSE;
         }
         break;
-    case A_SET:
-        // C_SET case (which coincidentally has the same number as A_SET)
+    case AF_TRANS:
+        // SET case (which coincidentally has the same number as AF_TRANS)
         if (control_frames[1])
             control_frames[2] = TRUE;
-        // Actual A_SET case
+        // Actual A case
         else if (control_frames[0])
             control_frames[1] = TRUE;
+        else
+            control_frames[0] = control_frames[1] = control_frames[2] = control_frames[3] = FALSE;
         break;
-    case BCC1_SET:
+    case (AF_TRANS ^ SET):
         if (control_frames[2])
             control_frames[3] = TRUE;
+        else
+            control_frames[0] = control_frames[1] = control_frames[2] = control_frames[3] = FALSE;
         break;
     default:
         control_frames[0] = control_frames[1] = control_frames[2] = control_frames[3] = FALSE;
         break;
     }
+}
+
+void check_disc_byte(BYTE s, int *control_frames)
+{
+    switch (s)
+    {
+    case FLAG:
+        // Read 2nd Flag (End of UA)
+        if (control_frames[3])
+            received_control = TRUE;
+        // Received normal Flag
+        else
+        {
+            control_frames[0] = TRUE;
+            control_frames[1] = control_frames[2] = control_frames[3] = FALSE;
+        }
+        break;
+    case AF_REC:
+        if (control_frames[0])
+            control_frames[1] = TRUE;
+        else
+            control_frames[0] = control_frames[1] = control_frames[2] = control_frames[3] = FALSE;
+        break;
+    case DISC:
+        if (control_frames[1])
+            control_frames[2] = TRUE;
+        else
+            control_frames[0] = control_frames[1] = control_frames[2] = control_frames[3] = FALSE;
+        break;
+    case (AF_REC ^ DISC):
+        if (control_frames[2])
+            control_frames[3] = TRUE;
+        else
+            control_frames[0] = control_frames[1] = control_frames[2] = control_frames[3] = FALSE;
+        break;
+    default:
+        // Restarting UA verification
+        control_frames[0] = control_frames[1] = control_frames[2] = control_frames[3] = FALSE;
+        break;
+    }
+}
+
+/* This function reads the beginning of the frame 
+and informs the llread function what type of control field it has */
+void llread_header_check(BYTE s, int control_frames[], BYTE *control_field)
+{
+    // BCC1 case
+    if (control_frames[2] && (s == (AF_TRANS ^ *control_field) || s == (AF_REC ^ *control_field)))
+        received_control = TRUE;
+    else if (s == FLAG)
+    {
+        // Received normal Flag
+        control_frames[0] = TRUE;
+        control_frames[1] = control_frames[2] = FALSE;
+    }
+    else if (control_frames[0] && s == AF_TRANS)
+    {
+        // SET case (which coincidentally has the same number as AF_TRANS)
+        /* Case where transmitor is stuck in llopen() because UA frame was lost and timed out */
+        if (control_frames[1])
+        {
+            control_frames[2] = TRUE;
+            *control_field = SET;
+        }
+        // Actual A case
+        control_frames[1] = TRUE;
+    }
+
+    // Information frame control field
+    else if (control_frames[1] && (s == DATA_CTRL_1 || s == DATA_CTRL_0 || s == DISC))
+    {
+        *control_field = s;
+        control_frames[2] = TRUE;
+    }
+    else
+        control_frames[0] = control_frames[1] = control_frames[2] = FALSE;
 }
 
 // Function responsible for the timeout of the transmitor in the llopen() function
@@ -501,5 +608,26 @@ void timeout_i()
     tries++;
     printf("data timeout: escrevendo # %d\n", tries);
     write(app_layer.fd, data_packet, frame_size);
+    flag = TRUE;
+}
+
+void timeout_disc()
+{
+    if (received_control)
+        return;
+    if (tries >= link_layer.numTransmissions)
+    {
+        failed_connection = TRUE;
+        return;
+    }
+    tries++;
+    printf("disc timeout: escrevendo # %d\n", tries);
+    
+    set[0] = FLAG;
+    set[1] = AF_TRANS;
+    set[2] = DISC;
+    set[3] = set[1] ^ set[2];
+    set[4] = FLAG;
+    write(app_layer.fd, set, 5);
     flag = TRUE;
 }
