@@ -50,7 +50,7 @@
 #define REPLACE_BYTE3 0x5D
 
 // Minimum of 9 bytes to fit control frames
-#define DATA_FRAMES_MAX_SIZE DATA_PACKAGE * 2 + 6
+#define DATA_FRAMES_MAX_SIZE DATA_PACKET * 2 + 6
 #define RR_0 0x05
 #define RR_1 0x85
 #define REJ_0 0x01

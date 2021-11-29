@@ -30,6 +30,7 @@ BYTE data_packet[DATA_FRAMES_MAX_SIZE];
 
 int llopen(AppLayer upper_layer)
 {
+    tries = 0;
     // making AppLayer info available to all functions in this page
     app_layer = upper_layer;
     int res;
@@ -48,7 +49,6 @@ int llopen(AppLayer upper_layer)
     if (app_layer.status == TRANSMITTER)
     {
         flag = TRUE;
-        tries = 0;
         failed_connection = FALSE;
         set[0] = FLAG;
         set[1] = AF_TRANS;
@@ -68,7 +68,7 @@ int llopen(AppLayer upper_layer)
         while (!received_control)
         {
             if (failed_connection)
-            {   
+            {
                 alarm(0);
                 port_restore();
                 fprintf(stderr, "Unable to connect after %d tries\n", link_layer.numTransmissions);
@@ -91,7 +91,8 @@ int llopen(AppLayer upper_layer)
         BYTE set_byte;
         while (!received_control)
         {
-            read(app_layer.fd, &set_byte, 1);
+            while (read(app_layer.fd, &set_byte, 1) < 0)
+                ;
             check_set_byte(set_byte, control_frames);
         }
 
@@ -158,7 +159,6 @@ int llwrite(BYTE *buff, int length)
     data_packet[cur_pos] = FLAG;
 
     frame_size = cur_pos + 1;
-    write(app_layer.fd, data_packet, frame_size);
 
     // Variables used for timeout function
     tries = 0;
@@ -166,6 +166,8 @@ int llwrite(BYTE *buff, int length)
     received_rr = FALSE;
     failed_connection = FALSE;
     (void)signal(SIGALRM, timeout_i);
+
+    write(app_layer.fd, data_packet, frame_size);
 
     BYTE ack;
     // Wrote data frame now we wait for the reply
@@ -188,6 +190,7 @@ int llwrite(BYTE *buff, int length)
             if ((ack == RR_0 && ns == 1) || (ack == RR_1 && ns == 0))
             {
                 received_rr = TRUE;
+                alarm(0);
                 ns = (ns == 1) ? 0 : 1;
                 return frame_size;
             }
@@ -201,7 +204,7 @@ int llwrite(BYTE *buff, int length)
             }
         }
     }
-
+    alarm(0);
     ns = (ns == 1) ? 0 : 1;
     return 0;
 }
@@ -214,7 +217,8 @@ int llread(BYTE *buff)
     BYTE b, control_field;
     while (!received_control)
     {
-        read(app_layer.fd, &b, 1);
+        while (read(app_layer.fd, &b, 1) < 0)
+            ;
         llread_header_check(b, control_frames, &control_field);
     }
     BYTE resp[5] = {FLAG, AF_TRANS, 0, 0, FLAG};
@@ -223,7 +227,9 @@ int llread(BYTE *buff)
     Reading 1 bit to check if its FLAG (Supervision or Unnumbered frames)
     or if its another bit (Data frame)
     */
-    read(app_layer.fd, &b, 1);
+    while (read(app_layer.fd, &b, 1) < 0)
+        ;
+
     if (b == FLAG) // Supervision or Unnumbered frames
     {
         // Transmitor did not receive UA
@@ -243,10 +249,13 @@ int llread(BYTE *buff)
             write(app_layer.fd, resp, 5);
             while (1)
             {
-                read(app_layer.fd, resp, 5);
+                while (read(app_layer.fd, resp, 5) < 0)
+                    ;
                 // if its a UA frame
                 if (resp[0] == FLAG && resp[4] == FLAG && resp[1] == AF_REC && resp[2] == UA && resp[3] == (resp[1] ^ resp[2]))
+                {
                     return 0;
+                }
                 // if the DISC frame again (UA was lost and transmittor timed out)
                 else if (resp[0] == FLAG && resp[4] == FLAG && resp[1] == AF_TRANS && resp[2] == DISC && resp[3] == (resp[1] ^ resp[2]))
                 {
@@ -272,7 +281,8 @@ int llread(BYTE *buff)
             BYTE b2;
             while (1)
             {
-                read(app_layer.fd, &b2, 1);
+                while (read(app_layer.fd, &b2, 1) < 0)
+                    ;
                 // BYTE DESTUFFING
                 if (b == REPLACE_BYTE1)
                 {
@@ -280,7 +290,8 @@ int llread(BYTE *buff)
                         b = buff[cur_pos] = ESC_BYTE1;
                     else if (b2 == REPLACE_BYTE3)
                         b = buff[cur_pos] = ESC_BYTE2;
-                    read(app_layer.fd, &b2, 1);
+                    while (read(app_layer.fd, &b2, 1) < 0)
+                        ;
                 }
                 // Data Frame ended
                 if (b2 == FLAG)
@@ -350,7 +361,7 @@ int llclose()
     send[1] = AF_REC;
     send[2] = UA;
     send[3] = send[1] ^ send[2];
-    write(app_layer.fd,send,5);
+    write(app_layer.fd, send, 5);
     alarm(0);
     int res = port_restore();
     if (res != 0) // error
@@ -590,7 +601,6 @@ void timeout_set()
         return;
     }
     tries++;
-    printf("set timeout: escrevendo # %d\n", tries);
     write(app_layer.fd, set, 5);
     flag = TRUE;
 }
@@ -606,7 +616,6 @@ void timeout_i()
         return;
     }
     tries++;
-    printf("data timeout: escrevendo # %d\n", tries);
     write(app_layer.fd, data_packet, frame_size);
     flag = TRUE;
 }
@@ -621,8 +630,6 @@ void timeout_disc()
         return;
     }
     tries++;
-    printf("disc timeout: escrevendo # %d\n", tries);
-    
     set[0] = FLAG;
     set[1] = AF_TRANS;
     set[2] = DISC;
