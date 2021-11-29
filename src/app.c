@@ -261,7 +261,7 @@ int main(int argc, char const *argv[])
         printf("Saved to %s file with %zu bytes\n", file_name, file_size);
         fclose(file_to_write);
         free(file_name);
-        return length;
+        return 0;
     }
 
     return 0;
