@@ -219,7 +219,6 @@ int main(int argc, char const *argv[])
                 }
             }
         }
-        printf("Saved to %s file with %zu bytes\n", file_name, file_size);
 
         FILE *file_to_write;
         file_to_write = fopen(file_name, "wb");
@@ -236,7 +235,8 @@ int main(int argc, char const *argv[])
 
         while ((length = llread(data_packet)))
         {
-            if(length < 0){
+            if (length < 0)
+            {
                 perror("llread");
                 return length;
             }
@@ -258,6 +258,7 @@ int main(int argc, char const *argv[])
             }
         }
 
+        printf("Saved to %s file with %zu bytes\n", file_name, file_size);
         fclose(file_to_write);
         free(file_name);
         return length;
