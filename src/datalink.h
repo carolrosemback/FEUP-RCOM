@@ -1,4 +1,3 @@
-// Calcular o bcc2 antes do byte stuffing e fazer stuffing do bcc2
 #ifndef DATALINK_H
 #define DATALINK_H
 

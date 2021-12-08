@@ -71,7 +71,7 @@ int llopen(AppLayer upper_layer)
             {
                 alarm(0);
                 port_restore();
-                fprintf(stderr, "Unable to connect after %d tries\n", link_layer.numTransmissions);
+                fprintf(stderr, "llopen Unable to connect after %d tries\n", link_layer.numTransmissions);
                 return -1;
             }
             if (flag)
@@ -176,7 +176,7 @@ int llwrite(BYTE *buff, int length)
         if (failed_connection)
         {
             port_restore();
-            fprintf(stderr, "Unable to connect after %d tries\n", link_layer.numTransmissions);
+            fprintf(stderr, "llwrite() Unable to connect after %d tries\n", link_layer.numTransmissions);
             return -1;
         }
         if (flag)
@@ -344,7 +344,7 @@ int llclose()
         if (failed_connection)
         {
             port_restore();
-            fprintf(stderr, "Unable to connect after %d tries\n", link_layer.numTransmissions);
+            fprintf(stderr, "llclose() Unable to connect after %d tries\n", link_layer.numTransmissions);
             return -1;
         }
         if (flag)
@@ -426,7 +426,7 @@ int port_restore()
     }
     if (close(app_layer.fd) == -1)
     {
-        perror("unable to close file descriptor");
+        perror("port_restore() unable to close file descriptor");
         return -1;
     }
     return 0;

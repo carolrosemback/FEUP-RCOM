@@ -8,6 +8,7 @@
 #include <termios.h>
 #include "datalink.h"
 #include "app.h"
+#include "statistics.h"
 
 int main(int argc, char const *argv[])
 {
@@ -158,7 +159,9 @@ int main(int argc, char const *argv[])
             data_packet[2] = bytes_read / 256;
             data_packet[3] = bytes_read % 256;
 
-            llwrite(data_packet, 4 + bytes_read);
+            if (llwrite(data_packet, 4 + bytes_read) < 0)
+                return -1;
+
             if (data_packet[3] != 0) // Then we reached the last data packet
             {
                 control_package[0] = C_END;
@@ -170,7 +173,7 @@ int main(int argc, char const *argv[])
         fclose(file_to_send);
         return llclose();
     }
-    else
+    else // Receiver
     {
         BYTE control_package[CONTROL_PACKAGE_MAX_SIZE];
         long length = llread(control_package);
@@ -232,9 +235,21 @@ int main(int argc, char const *argv[])
         BYTE data_packet[DATA_PACKET];
 
         int n = 0;
+        off_t received_file_size = 0;
 
+        // Used for statistics.h
+        uint64_t llread_total_time = 0;
+        off_t llread_total_bytes_read = 0;
+        struct timespec start, end;
+        clock_gettime(CLOCK_MONOTONIC, &start); /* mark start time */
+        
         while ((length = llread(data_packet)))
         {
+            // Used for statistics.h
+            clock_gettime(CLOCK_MONOTONIC, &end);   /* mark the end time */
+            llread_total_bytes_read += length;
+            llread_total_time += time_passed(start,end);
+
             if (length < 0)
             {
                 perror("llread");
@@ -248,6 +263,7 @@ int main(int argc, char const *argv[])
             }
             else if (n == data_packet[1])
             {
+                received_file_size += length - 4; // to check if expected size and received size match
                 n = (n + 1) % 256;
                 fwrite(data_packet + 4, length - 4, 1, file_to_write);
             }
@@ -256,9 +272,19 @@ int main(int argc, char const *argv[])
                 perror("A data packet was lost\n");
                 return -1;
             }
+            // Used for statistics.h
+            clock_gettime(CLOCK_MONOTONIC, &start); /* mark start time */
         }
 
+        if (received_file_size != file_size)
+        {
+            perror("Received file size and expected file size dont match!");
+            fclose(file_to_write);
+            free(file_name);
+            return received_file_size - file_size;
+        }
         printf("Saved to %s file with %zu bytes\n", file_name, file_size);
+        printf("Time spent in llread: %llu, bytes read: %zu\n", (long long unsigned int)llread_total_time, llread_total_bytes_read);
         fclose(file_to_write);
         free(file_name);
         return 0;
