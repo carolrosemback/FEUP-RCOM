@@ -11,7 +11,7 @@
 
 // Maximum amount of time the function read() wait for a byte
 #define MAX_TIME_TRANSMITTER 1
-#define MAX_TIME_RECEIVER 5
+#define MAX_TIME_RECEIVER 1
 // Minimum amount of bytes to be received for read() to exit function
 #define MIN_BYTES_TRANSMITTER 0
 #define MIN_BYTES_RECEIVER 1
@@ -38,7 +38,7 @@
 // Commands sent by the receiver and replies sent by transmitter
 #define AF_REC 0x01
 
-#define BAUDRATE B9600
+#define BAUDRATE B38400
 
 // Escape bytes
 #define ESC_BYTE1 0x7E
