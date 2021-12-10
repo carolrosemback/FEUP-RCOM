@@ -243,11 +243,8 @@ int main(int argc, char const *argv[])
         struct timespec start, end;
         clock_gettime(CLOCK_MONOTONIC, &start); /* mark start time */
         
-        do
+        while ((length = llread(data_packet)))
         {
-            // Used for statistics.h
-            clock_gettime(CLOCK_MONOTONIC, &start); /* mark start time */
-            length = llread(data_packet);
             // Used for statistics.h
             clock_gettime(CLOCK_MONOTONIC, &end);   /* mark the end time */
             llread_total_bytes_read += length;
@@ -275,7 +272,9 @@ int main(int argc, char const *argv[])
                 perror("A data packet was lost\n");
                 return -1;
             }
-        } while((length = llread(data_packet)) > 0);
+            // Used for statistics.h
+            clock_gettime(CLOCK_MONOTONIC, &start); /* mark start time */
+        }
 
         if (received_file_size != file_size)
         {
