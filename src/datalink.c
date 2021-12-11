@@ -37,7 +37,7 @@ int llopen(AppLayer upper_layer)
     if (!port_configured)
     {
         res = port_setup();
-        if (res < 0) // error
+        if (res < 0) //error
             return res;
         port_configured = TRUE;
     }
@@ -91,11 +91,8 @@ int llopen(AppLayer upper_layer)
         BYTE set_byte;
         while (!received_control)
         {
-            if (read(app_layer.fd, &set_byte, 1) < 0)
-            {
-                perror("read");
-                return -1;
-            }
+            while (read(app_layer.fd, &set_byte, 1) < 0)
+                ;
             check_set_byte(set_byte, control_frames);
         }
 
@@ -220,24 +217,18 @@ int llread(BYTE *buff)
     BYTE b, control_field;
     while (!received_control)
     {
-        if (read(app_layer.fd, &b, 1) < 0)
-        {
-            perror("read");
-            return -1;
-        }
+        while (read(app_layer.fd, &b, 1) < 0)
+            ;
         llread_header_check(b, control_frames, &control_field);
     }
     BYTE resp[5] = {FLAG, AF_TRANS, 0, 0, FLAG};
 
-    /*
+    /* 
     Reading 1 bit to check if its FLAG (Supervision or Unnumbered frames)
     or if its another bit (Data frame)
     */
-    if (read(app_layer.fd, &b, 1) < 0)
-    {
-        perror("read");
-        return -1;
-    }
+    while (read(app_layer.fd, &b, 1) < 0)
+        ;
 
     if (b == FLAG) // Supervision or Unnumbered frames
     {
@@ -258,11 +249,8 @@ int llread(BYTE *buff)
             write(app_layer.fd, resp, 5);
             while (1)
             {
-                if (read(app_layer.fd, resp, 5) < 0)
-                {
-                    perror("read");
-                    return -1;
-                }
+                while (read(app_layer.fd, resp, 5) < 0)
+                    ;
                 // if its a UA frame
                 if (resp[0] == FLAG && resp[4] == FLAG && resp[1] == AF_REC && resp[2] == UA && resp[3] == (resp[1] ^ resp[2]))
                 {
@@ -293,11 +281,8 @@ int llread(BYTE *buff)
             BYTE b2;
             while (1)
             {
-                if (read(app_layer.fd, &b2, 1) < 0)
-                {
-                    perror("read");
-                    return -1;
-                }
+                while (read(app_layer.fd, &b2, 1) < 0)
+                    ;
                 // BYTE DESTUFFING
                 if (b == REPLACE_BYTE1)
                 {
@@ -305,11 +290,8 @@ int llread(BYTE *buff)
                         b = buff[cur_pos] = ESC_BYTE1;
                     else if (b2 == REPLACE_BYTE3)
                         b = buff[cur_pos] = ESC_BYTE2;
-                    if (read(app_layer.fd, &b2, 1) < 0)
-                    {
-                        perror("read");
-                        return -1;
-                    }
+                    while (read(app_layer.fd, &b2, 1) < 0)
+                        ;
                 }
                 // Data Frame ended
                 if (b2 == FLAG)
@@ -571,7 +553,7 @@ void check_disc_byte(BYTE s, int *control_frames)
     }
 }
 
-/* This function reads the beginning of the frame
+/* This function reads the beginning of the frame 
 and informs the llread function what type of control field it has */
 void llread_header_check(BYTE s, int control_frames[], BYTE *control_field)
 {
