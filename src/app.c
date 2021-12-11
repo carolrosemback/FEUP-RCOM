@@ -93,7 +93,6 @@ int main(int argc, char const *argv[])
         }
 
         size_t cur_pos = 0;
-        // 3 Bytes 2 Integers and 2 Variables (l1,l2)
         size_t control_size = 3 + 2 + l1 + l2;
         BYTE control_package[control_size];
         // Filling control package
