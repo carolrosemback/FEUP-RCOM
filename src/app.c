@@ -257,7 +257,9 @@ int main(int argc, char const *argv[])
             }
             if (data_packet[0] == C_END)
             {
-                
+                fclose(file_to_write);
+                // To close connection with llopen
+                llread(data_packet);
                 break;
             }
             else if (n == data_packet[1])
@@ -274,16 +276,16 @@ int main(int argc, char const *argv[])
             // Used for statistics.h
             clock_gettime(CLOCK_MONOTONIC, &start); /* mark start time */
         }
-        fclose(file_to_write);
+        
         if (received_file_size != file_size)
         {
             perror("Received file size and expected file size dont match!");
-            
             free(file_name);
             return received_file_size - file_size;
         }
         printf("Saved to %s file with %zu bytes\n", file_name, file_size);
         printf("Time spent in llread: %llu, bytes read: %zu\n", (long long unsigned int)llread_total_time, llread_total_bytes_read);
+        
         free(file_name);
         return 0;
     }
