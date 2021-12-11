@@ -261,10 +261,11 @@ int main(int argc, char const *argv[])
             {
                 printf("REACHED END\n");
                 int var = llread(data_packet);
+                printf(".|%d|\n",var);
                 // Checking there is nothing more to read
                 if (var <= 0)
                     break;
-                printf(".|%d|",var);
+                printf(".|%d|\n",var);
 
             }
             else if (n == data_packet[1])
