@@ -175,7 +175,7 @@ int main(int argc, char const *argv[])
     }
     else // Receiver
     {
-        init_errors();
+        // init_errors();
         BYTE control_package[CONTROL_PACKAGE_MAX_SIZE];
         long length = llread(control_package);
         if (length <= 0)
@@ -261,7 +261,8 @@ int main(int argc, char const *argv[])
                 fclose(file_to_write);
                 printf("Saved to %s file with %zu bytes\n", file_name, file_size);
                 printf("Time spent in llread: %llu, bytes read: %zu\n", (long long unsigned int)llread_total_time, llread_total_bytes_read);
-                print_error_stats();
+                printf("Size of Frame I:%d\n", DATA_PACKET)
+                // print_error_stats();
                 // To close connection with llopen
                 llread(data_packet);
                 break;

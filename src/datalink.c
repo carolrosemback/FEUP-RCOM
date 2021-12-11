@@ -1,5 +1,5 @@
 #include "datalink.h"
-#include "statistics.h"
+//#include "statistics.h"
 
 int port_restore();
 int port_setup();
@@ -32,7 +32,7 @@ int llopen(AppLayer upper_layer)
     if (!port_configured)
     {
         res = port_setup();
-        if (res < 0) //error
+        if (res < 0) // error
             return res;
         port_configured = TRUE;
     }
@@ -98,7 +98,7 @@ int llopen(AppLayer upper_layer)
         ua[3] = ua[1] ^ ua[2];
         ua[4] = FLAG;
         write(app_layer.fd, ua, 5);
-        init_errors(); // Used to generate errors in llread()
+        // init_errors(); // Used to generate errors in llread()
     }
     alarm(0);
     return app_layer.fd;
@@ -107,7 +107,7 @@ int llopen(AppLayer upper_layer)
 // App data package is always smaller than Data-Link package
 int llwrite(BYTE *buff, int length)
 {
-    
+
     data_packet[0] = FLAG;
     data_packet[1] = AF_TRANS;
     data_packet[2] = (ns == 1) ? DATA_CTRL_1 : DATA_CTRL_0;
@@ -216,13 +216,15 @@ int llread(BYTE *buff)
     {
         while (read(app_layer.fd, &b, 1) < 0)
             ;
+        /*
         if(b != FLAG) random_error_header(b);
         else entering_frame();
+        */
         llread_header_check(b, control_frames, &control_field);
     }
     BYTE resp[5] = {FLAG, AF_TRANS, 0, 0, FLAG};
 
-    /* 
+    /*
     Reading 1 bit to check if its FLAG (Supervision or Unnumbered frames)
     or if its another bit (Data frame)
     */
@@ -282,7 +284,7 @@ int llread(BYTE *buff)
             {
                 while (read(app_layer.fd, &b2, 1) < 0)
                     ;
-                if(b2 != FLAG) b2 = random_error_data(b2);
+                /*if(b2 != FLAG) b2 = random_error_data(b2); */
                 // BYTE DESTUFFING
                 if (b == REPLACE_BYTE1)
                 {
@@ -296,7 +298,7 @@ int llread(BYTE *buff)
                 // Data Frame ended
                 if (b2 == FLAG)
                 {
-                    exited_frame();
+                    // exited_frame();
                     resp[1] = AF_TRANS;
                     if (bcc2 == b)
                     {
@@ -554,7 +556,7 @@ void check_disc_byte(BYTE s, int *control_frames)
     }
 }
 
-/* This function reads the beginning of the frame 
+/* This function reads the beginning of the frame
 and informs the llread function what type of control field it has */
 void llread_header_check(BYTE s, int control_frames[], BYTE *control_field)
 {

@@ -13,7 +13,7 @@
 // Used in signal alarm() function
 #define ALARM_TIMEOUT 3
 // Max transmissions allowed after timeout
-#define RETRANS_MAX 10
+#define RETRANS_MAX 3
 
 // Maximum amount of time the function read() wait for a byte
 #define MAX_TIME_TRANSMITTER 1
