@@ -224,7 +224,7 @@ int main(int argc, char const *argv[])
         }
 
         FILE *file_to_write;
-        file_to_write = fopen("teste.gif", "wb");
+        file_to_write = fopen(file_name, "wb");
 
         if (file_to_write < 0)
         {
