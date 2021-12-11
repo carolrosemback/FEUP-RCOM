@@ -5,7 +5,7 @@
 #define RECEIVER 0
 
 // 4 Bytes for processing and Data
-#define DATA_PACKET 4 + 256
+#define DATA_PACKET 4 + 256 * 5
 // Calculated max size was 255*2 + 4
 #define CONTROL_PACKAGE_MAX_SIZE 256*2 + 4
 #define C_START 0x02
