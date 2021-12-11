@@ -93,6 +93,7 @@ int main(int argc, char const *argv[])
         }
 
         size_t cur_pos = 0;
+        
         size_t control_size = 3 + 2 + l1 + l2;
         BYTE control_package[control_size];
         // Filling control package
@@ -274,7 +275,7 @@ int main(int argc, char const *argv[])
             // Used for statistics.h
             clock_gettime(CLOCK_MONOTONIC, &start); /* mark start time */
         }
-
+        printf("Ended stream");
         if (received_file_size != file_size)
         {
             perror("Received file size and expected file size dont match!");
