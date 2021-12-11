@@ -93,7 +93,7 @@ int main(int argc, char const *argv[])
         }
 
         size_t cur_pos = 0;
-        
+
         size_t control_size = 3 + 2 + l1 + l2;
         BYTE control_package[control_size];
         // Filling control package
@@ -242,13 +242,13 @@ int main(int argc, char const *argv[])
         off_t llread_total_bytes_read = 0;
         struct timespec start, end;
         clock_gettime(CLOCK_MONOTONIC, &start); /* mark start time */
-        
+
         while ((length = llread(data_packet)))
         {
             // Used for statistics.h
-            clock_gettime(CLOCK_MONOTONIC, &end);   /* mark the end time */
+            clock_gettime(CLOCK_MONOTONIC, &end); /* mark the end time */
             llread_total_bytes_read += length;
-            llread_total_time += time_passed(start,end);
+            llread_total_time += time_passed(start, end);
 
             if (length < 0)
             {
@@ -258,6 +258,8 @@ int main(int argc, char const *argv[])
             if (data_packet[0] == C_END)
             {
                 fclose(file_to_write);
+                printf("Saved to %s file with %zu bytes\n", file_name, file_size);
+                printf("Time spent in llread: %llu, bytes read: %zu\n", (long long unsigned int)llread_total_time, llread_total_bytes_read);
                 // To close connection with llopen
                 llread(data_packet);
                 break;
@@ -276,16 +278,13 @@ int main(int argc, char const *argv[])
             // Used for statistics.h
             clock_gettime(CLOCK_MONOTONIC, &start); /* mark start time */
         }
-        
+
         if (received_file_size != file_size)
         {
             perror("Received file size and expected file size dont match!");
             free(file_name);
             return received_file_size - file_size;
         }
-        printf("Saved to %s file with %zu bytes\n", file_name, file_size);
-        printf("Time spent in llread: %llu, bytes read: %zu\n", (long long unsigned int)llread_total_time, llread_total_bytes_read);
-        
         free(file_name);
         return 0;
     }
