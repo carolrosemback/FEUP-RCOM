@@ -260,9 +260,12 @@ int main(int argc, char const *argv[])
             if (data_packet[0] == C_END)
             {
                 printf("REACHED END\n");
+                int var = llread(data_packet);
                 // Checking there is nothing more to read
-                if (llread(data_packet) <= 0)
+                if (var <= 0)
                     break;
+                printf(".|%d|",var);
+
             }
             else if (n == data_packet[1])
             {
