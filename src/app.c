@@ -245,7 +245,6 @@ int main(int argc, char const *argv[])
         
         while ((length = llread(data_packet)))
         {
-            printf("--%d--\n", length);
             // Used for statistics.h
             clock_gettime(CLOCK_MONOTONIC, &end);   /* mark the end time */
             llread_total_bytes_read += length;
@@ -253,12 +252,12 @@ int main(int argc, char const *argv[])
 
             if (length < 0)
             {
-                printf("llread error\n");
                 perror("llread");
                 return length;
             }
             if (data_packet[0] == C_END)
             {
+                fclose(file_to_write);
                 break;
             }
             else if (n == data_packet[1])
@@ -275,17 +274,16 @@ int main(int argc, char const *argv[])
             // Used for statistics.h
             clock_gettime(CLOCK_MONOTONIC, &start); /* mark start time */
         }
-        printf("Ended stream\n");
+        
         if (received_file_size != file_size)
         {
             perror("Received file size and expected file size dont match!");
-            fclose(file_to_write);
+            
             free(file_name);
             return received_file_size - file_size;
         }
         printf("Saved to %s file with %zu bytes\n", file_name, file_size);
         printf("Time spent in llread: %llu, bytes read: %zu\n", (long long unsigned int)llread_total_time, llread_total_bytes_read);
-        fclose(file_to_write);
         free(file_name);
         return 0;
     }
