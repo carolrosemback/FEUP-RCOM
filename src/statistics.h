@@ -9,8 +9,8 @@
 #include "math.h"
 #include "app.h"
 
-#define FER_HEADER 20 /* error % on the header */
-#define FER_DATA 20   /* error % on the data */
+#define FER_HEADER 10 /* error % on the header */
+#define FER_DATA 10   /* error % on the data */
 
 
 uint64_t time_passed(struct timespec, struct timespec);
