@@ -224,7 +224,7 @@ int main(int argc, char const *argv[])
         }
 
         FILE *file_to_write;
-        file_to_write = fopen(file_name, "wb");
+        file_to_write = fopen("teste.gif", "wb");
 
         if (file_to_write < 0)
         {
@@ -249,7 +249,7 @@ int main(int argc, char const *argv[])
             clock_gettime(CLOCK_MONOTONIC, &end); /* mark the end time */
             llread_total_bytes_read += length;
             llread_total_time += time_passed(start, end);
-
+            
             if (length < 0)
             {
                 perror("llread");
@@ -260,6 +260,7 @@ int main(int argc, char const *argv[])
                 fclose(file_to_write);
                 printf("Saved to %s file with %zu bytes\n", file_name, file_size);
                 printf("Time spent in llread: %llu, bytes read: %zu\n", (long long unsigned int)llread_total_time, llread_total_bytes_read);
+                print_error_stats();
                 // To close connection with llopen
                 llread(data_packet);
                 break;

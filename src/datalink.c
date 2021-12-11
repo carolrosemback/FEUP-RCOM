@@ -1,4 +1,5 @@
 #include "datalink.h"
+#include "statistics.h"
 
 int port_restore();
 int port_setup();
@@ -97,6 +98,7 @@ int llopen(AppLayer upper_layer)
         ua[3] = ua[1] ^ ua[2];
         ua[4] = FLAG;
         write(app_layer.fd, ua, 5);
+        init_errors(); // Used to generate errors in llread()
     }
     alarm(0);
     return app_layer.fd;
@@ -105,6 +107,7 @@ int llopen(AppLayer upper_layer)
 // App data package is always smaller than Data-Link package
 int llwrite(BYTE *buff, int length)
 {
+    
     data_packet[0] = FLAG;
     data_packet[1] = AF_TRANS;
     data_packet[2] = (ns == 1) ? DATA_CTRL_1 : DATA_CTRL_0;
@@ -213,6 +216,7 @@ int llread(BYTE *buff)
     {
         while (read(app_layer.fd, &b, 1) < 0)
             ;
+        
         llread_header_check(b, control_frames, &control_field);
     }
     BYTE resp[5] = {FLAG, AF_TRANS, 0, 0, FLAG};
@@ -277,6 +281,7 @@ int llread(BYTE *buff)
             {
                 while (read(app_layer.fd, &b2, 1) < 0)
                     ;
+                if(b2 != FLAG) b2 = random_error_data(b2);
                 // BYTE DESTUFFING
                 if (b == REPLACE_BYTE1)
                 {
@@ -290,6 +295,7 @@ int llread(BYTE *buff)
                 // Data Frame ended
                 if (b2 == FLAG)
                 {
+                    entering_frame();
                     resp[1] = AF_TRANS;
                     if (bcc2 == b)
                     {
