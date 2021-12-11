@@ -16,8 +16,8 @@ void init_errors()
 void entering_frame()
 {
     total_frames++;
-    pos_data = 0;
-    pos_header = 0;
+    pos_data = -1;
+    pos_header = -1;
     if (1 + rand() % 100 <= FER_DATA)
     {
         frames_with_errors_data++;
@@ -62,5 +62,5 @@ BYTE random_error_data(BYTE b)
 
 void print_error_stats()
 {
-    printf("corrupted %ld data and %ld header from a total of %ld frames\n", frames_with_errors_data,frames_with_errors_header,total_frames);
+    printf("corrupted %ld data and %ld header from a total of %ld frames\n", frames_with_errors_data, frames_with_errors_header, total_frames);
 }

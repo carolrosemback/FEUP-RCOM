@@ -216,7 +216,8 @@ int llread(BYTE *buff)
     {
         while (read(app_layer.fd, &b, 1) < 0)
             ;
-        
+        if(b != FLAG) random_error_header(b);
+        else entering_frame();
         llread_header_check(b, control_frames, &control_field);
     }
     BYTE resp[5] = {FLAG, AF_TRANS, 0, 0, FLAG};
@@ -295,7 +296,7 @@ int llread(BYTE *buff)
                 // Data Frame ended
                 if (b2 == FLAG)
                 {
-                    entering_frame();
+                    exited_frame();
                     resp[1] = AF_TRANS;
                     if (bcc2 == b)
                     {

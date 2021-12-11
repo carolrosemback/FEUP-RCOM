@@ -175,6 +175,7 @@ int main(int argc, char const *argv[])
     }
     else // Receiver
     {
+        init_errors();
         BYTE control_package[CONTROL_PACKAGE_MAX_SIZE];
         long length = llread(control_package);
         if (length <= 0)
