@@ -259,6 +259,7 @@ int main(int argc, char const *argv[])
             }
             if (data_packet[0] == C_END)
             {
+                printf("REACHED END\n");
                 // Checking there is nothing more to read
                 if (llread(data_packet) <= 0)
                     break;
