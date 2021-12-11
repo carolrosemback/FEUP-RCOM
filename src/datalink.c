@@ -1,9 +1,3 @@
-#include <unistd.h>
-#include <stdio.h>
-#include <sys/types.h>
-#include <string.h>
-#include <signal.h>
-#include <stdlib.h>
 #include "datalink.h"
 
 int port_restore();

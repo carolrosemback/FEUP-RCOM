@@ -2,6 +2,12 @@
 #define DATALINK_H
 
 #include <termios.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <string.h>
+#include <signal.h>
+#include <stdlib.h>
 #include "app.h"
 
 // Used in signal alarm() function
