@@ -38,7 +38,7 @@
 // Commands sent by the receiver and replies sent by transmitter
 #define AF_REC 0x01
 
-#define BAUDRATE B4800
+#define BAUDRATE B19200
 
 // Escape bytes
 #define ESC_BYTE1 0x7E
