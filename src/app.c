@@ -253,13 +253,14 @@ int main(int argc, char const *argv[])
 
             if (length < 0)
             {
+                printf("llread error\n");
                 perror("llread");
                 return length;
             }
             if (data_packet[0] == C_END)
             {
                 // Checking there is nothing more to read
-                if (llread(data_packet) == 0)
+                if (llread(data_packet) <= 0)
                     break;
             }
             else if (n == data_packet[1])
