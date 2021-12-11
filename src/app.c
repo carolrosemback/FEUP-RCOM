@@ -245,6 +245,7 @@ int main(int argc, char const *argv[])
         
         while ((length = llread(data_packet)))
         {
+            printf("--%d--\n", length);
             // Used for statistics.h
             clock_gettime(CLOCK_MONOTONIC, &end);   /* mark the end time */
             llread_total_bytes_read += length;
@@ -275,7 +276,7 @@ int main(int argc, char const *argv[])
             // Used for statistics.h
             clock_gettime(CLOCK_MONOTONIC, &start); /* mark start time */
         }
-        printf("Ended stream");
+        printf("Ended stream\n");
         if (received_file_size != file_size)
         {
             perror("Received file size and expected file size dont match!");
