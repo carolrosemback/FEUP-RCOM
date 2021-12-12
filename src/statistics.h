@@ -11,7 +11,7 @@
 
 #define FER_HEADER 20 /* error % on the header */
 #define FER_DATA 20   /* error % on the data */
-#define EXTRA_T_PROP 1000 // Extra propagation time that will be added using usleep
+#define EXTRA_T_PROP 1000 // Extra propagation time in ms
 
 
 uint64_t time_passed(struct timespec, struct timespec);
