@@ -9,9 +9,9 @@
 #include "math.h"
 #include "app.h"
 
-#define FER_HEADER 0 /* error % on the header */
-#define FER_DATA 0   /* error % on the data */
-#define EXTRA_T_PROP 0 // Extra propagation time that will be added using usleep
+#define FER_HEADER 20 /* error % on the header */
+#define FER_DATA 20   /* error % on the data */
+#define EXTRA_T_PROP 1000 // Extra propagation time that will be added using usleep
 
 
 uint64_t time_passed(struct timespec, struct timespec);
