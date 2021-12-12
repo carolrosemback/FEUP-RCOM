@@ -1,5 +1,5 @@
 #include "datalink.h"
-//#include "statistics.h"
+#include "statistics.h"
 
 int port_restore();
 int port_setup();
@@ -208,6 +208,7 @@ int llwrite(BYTE *buff, int length)
 
 int llread(BYTE *buff)
 {
+    usleep(EXTRA_T_PROP);
     int control_frames[5];
     memset(control_frames, FALSE, 5 * sizeof(int));
     received_control = FALSE;
